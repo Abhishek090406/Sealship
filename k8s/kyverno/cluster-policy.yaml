@@ -1,0 +1,54 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-sealship-image
+  annotations:
+    policies.kyverno.io/title: Verify Signed Images & Registry Integrity
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Ensures that only container images from the trusted SealShip registry
+      and cryptographically signed with the SealShip Cosign key are admitted to the cluster.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: restrict-to-trusted-registry
+      match:
+        any:
+        - resources:
+            namespaces:
+            - sealship-demo
+            kinds:
+            - Pod
+      validate:
+        message: "Untrusted registry: Only images built and signed through SealShip's local registry 'localhost:5001/*' are permitted in sealship-demo."
+        pattern:
+          spec:
+            containers:
+            - image: "localhost:5001/*"
+    - name: verify-signature-sealship
+      match:
+        any:
+        - resources:
+            namespaces:
+            - sealship-demo
+            kinds:
+            - Pod
+      verifyImages:
+      - imageReferences:
+        - "localhost:5001/*"
+        mutateDigest: false
+        verifyDigest: false
+        required: true
+        useCache: false
+        attestors:
+        - entries:
+          - keys:
+              publicKeys: |
+                -----BEGIN PUBLIC KEY-----
+                MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEqBIgYt+R7CpRKLFHG9hS/u7CIVUN
+                tL9nYA7EAkVex+B+iExmC7v1e8S9Omc4IB5xji+o5Vk5RK7MawWXyIZssg==
+                -----END PUBLIC KEY-----
+              rekor:
+                ignoreTlog: true

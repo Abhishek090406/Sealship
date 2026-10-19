@@ -1,0 +1,40 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-sealship-image
+  annotations:
+    policies.kyverno.io/title: Verify Signed Images
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: >-
+      Ensures that only container images cryptographically signed with the
+      SealShip Cosign key are admitted to the cluster. Unsigned or tampered
+      images are rejected.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: verify-signature-sealship
+      match:
+        any:
+        - resources:
+            namespaces:
+            - sealship-demo
+            kinds:
+            - Pod
+      verifyImages:
+      - imageReferences:
+        - "localhost:5001/*"
+        mutateDigest: false
+        verifyDigest: false
+        required: true
+        useCache: false
+        attestors:
+        - entries:
+          - keys:
+              publicKeys: |
+                -----BEGIN PUBLIC KEY-----
+                {{COSIGN_PUB_KEY}}
+                -----END PUBLIC KEY-----
+              rekor:
+                ignoreTlog: true
